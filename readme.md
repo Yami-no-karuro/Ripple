@@ -12,7 +12,7 @@ Built for performance and reliability, with support for parallel processing thro
 Compile the ripple binary:
 
 ```bash
-gcc -o ripple ripple.c -Wall -Wextra -O2
+gcc -o ripple ripple.c
 ```
 
 Make sure the binary is in your PATH or note its location for use with `sync.sh`.
