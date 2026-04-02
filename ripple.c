@@ -6,6 +6,7 @@
 #include <fcntl.h>
 #include <dirent.h>
 #include <errno.h>
+
 #include <sys/stat.h>
 #include <sys/types.h>
 
@@ -25,7 +26,7 @@ int parse_args(int argc, char *argv[], args_t *args)
     }
 
     struct stat stat_buff;
-    if (stat(argv[1], &stat_buff) != 0 || S_ISDIR(stat_buff.st_mode)) {
+    if (stat(argv[1], &stat_buff) != 0 || !S_ISDIR(stat_buff.st_mode)) {
         fprintf(stderr, "[!] Invalid source path '%s'\n", argv[1]);
         return -1;
     }
@@ -52,6 +53,7 @@ int copy_file(const char *src_path, const char *dst_path)
 
     unsigned char buf[FILE_BUF_SIZE];
     size_t n;
+
     while ((n = fread(buf, 1, FILE_BUF_SIZE, src)) > 0) {
         if (fwrite(buf, 1, n, dst) != n) {
             fprintf(stderr, "[!] Unable to write to file '%s'\n", dst_path);
@@ -92,7 +94,6 @@ int copy_directory(const char *src_path, const char *dst_path)
 
         snprintf(src_entry_path, PATH_BUF_SIZE, "%s/%s", src_path, entry->d_name);
         snprintf(dst_entry_path, PATH_BUF_SIZE, "%s/%s", dst_path, entry->d_name);
-        printf("%s -> %s\n", src_entry_path, dst_entry_path);
 
         switch (entry->d_type) {
             case DT_DIR:
@@ -122,5 +123,9 @@ int main(int argc, char *argv[])
     if (parse_args(argc, argv, &args))
         return -1;
 
-    return copy_directory(args.src, args.dst);
+    int result;
+    if ((result = copy_directory(args.src, args.dst)) == 0)
+        printf("Successfully executed.\n");
+
+    return result;
 }
