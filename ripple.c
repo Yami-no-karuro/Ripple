@@ -92,8 +92,13 @@ int copy_directory(const char *src_path, const char *dst_path)
         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
             continue;
 
-        snprintf(src_entry_path, PATH_BUF_SIZE, "%s/%s", src_path, entry->d_name);
-        snprintf(dst_entry_path, PATH_BUF_SIZE, "%s/%s", dst_path, entry->d_name);
+        int src_path_size = snprintf(src_entry_path, PATH_BUF_SIZE, "%s/%s", src_path, entry->d_name);
+        int dst_path_size = snprintf(dst_entry_path, PATH_BUF_SIZE, "%s/%s", dst_path, entry->d_name);
+
+        if (src_path_size < 0 || src_path_size >= PATH_BUF_SIZE || dst_path_size < 0 || dst_path_size >= PATH_BUF_SIZE) {
+            fprintf(stderr, "[!] Unable format path to '%s'\n", entry->d_name);
+            return -1;
+        }
 
         switch (entry->d_type) {
             case DT_DIR:
@@ -123,9 +128,5 @@ int main(int argc, char *argv[])
     if (parse_args(argc, argv, &args))
         return -1;
 
-    int result;
-    if ((result = copy_directory(args.src, args.dst)) == 0)
-        printf("Successfully executed.\n");
-
-    return result;
+    return copy_directory(args.src, args.dst);
 }
