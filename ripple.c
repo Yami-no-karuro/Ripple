@@ -10,8 +10,8 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#define FILE_BUF_SIZE 4096
-#define PATH_BUF_SIZE 256
+#define FILE_BUF_SIZE 8192
+#define PATH_BUF_SIZE 512
 
 typedef struct {
     const char *src;
@@ -21,13 +21,18 @@ typedef struct {
 int parse_args(int argc, char *argv[], args_t *args)
 {
     if (argc != 3) {
-        fprintf(stderr, "Usage: %s <src> <dst>\n", argv[0]);
+        fprintf(stderr, "Usage: %s <source> <destination>\n", argv[0]);
         return -1;
     }
 
     struct stat stat_buff;
     if (stat(argv[1], &stat_buff) != 0 || !S_ISDIR(stat_buff.st_mode)) {
         fprintf(stderr, "[!] Invalid source path '%s'\n", argv[1]);
+        return -1;
+    }
+
+    if (stat(argv[2], &stat_buff) != 0 || !S_ISDIR(stat_buff.st_mode)) {
+        fprintf(stderr, "[!] Invalid destination path '%s'\n", argv[1]);
         return -1;
     }
     
