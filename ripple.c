@@ -11,7 +11,7 @@
 #include <sys/types.h>
 
 #define FILE_BUF_SIZE 8192
-#define PATH_BUF_SIZE 512
+#define PATH_BUF_SIZE 2048
 
 typedef struct {
     const char *src;
@@ -25,17 +25,18 @@ int parse_args(int argc, char *argv[], args_t *args)
         return -1;
     }
 
-    struct stat stat_buff;
-    if (stat(argv[1], &stat_buff) != 0 || !S_ISDIR(stat_buff.st_mode)) {
+    struct stat src_stat_buff;
+    if (stat(argv[1], &src_stat_buff) != 0 || !S_ISDIR(src_stat_buff.st_mode)) {
         fprintf(stderr, "[!] Invalid source path '%s'\n", argv[1]);
         return -1;
     }
 
-    if (stat(argv[2], &stat_buff) != 0 || !S_ISDIR(stat_buff.st_mode)) {
-        fprintf(stderr, "[!] Invalid destination path '%s'\n", argv[1]);
+    struct stat dst_stat_buff;
+    if (stat(argv[2], &dst_stat_buff) != 0 || !S_ISDIR(dst_stat_buff.st_mode)) {
+        fprintf(stderr, "[!] Invalid destination path '%s'\n", argv[2]);
         return -1;
     }
-    
+
     args->src = argv[1];
     args->dst = argv[2];
     return 0;
@@ -43,6 +44,12 @@ int parse_args(int argc, char *argv[], args_t *args)
 
 int copy_file(const char *src_path, const char *dst_path)
 {
+    struct stat src_stat;
+    if (stat(src_path, &src_stat) != 0) {
+        fprintf(stderr, "[!] Unable to stat file '%s'\n", src_path);
+        return -1;
+    }
+
     FILE *src = fopen(src_path, "rb");
     if (!src) {
         fprintf(stderr, "[!] Unable to open file '%s' for reading\n", src_path);
@@ -71,12 +78,24 @@ int copy_file(const char *src_path, const char *dst_path)
     int ok = feof(src) ? 0 : -1;
     fclose(src);
     fclose(dst);
+
+    if (ok == 0 && chmod(dst_path, src_stat.st_mode) != 0) {
+        fprintf(stderr, "[!] Unable to set permissions on file '%s'\n", dst_path);
+        return -1;
+    }
+
     return ok;
 }
 
 int copy_directory(const char *src_path, const char *dst_path)
 {
-    if (mkdir(dst_path, 0755) != 0) {
+    struct stat src_stat;
+    if (stat(src_path, &src_stat) != 0) {
+        fprintf(stderr, "[!] Unable to stat directory '%s'\n", src_path);
+        return -1;
+    }
+
+    if (mkdir(dst_path, src_stat.st_mode) != 0) {
         if (errno != EEXIST) {
             fprintf(stderr, "[!] Unable to create directory '%s'\n", dst_path);
             return -1;
@@ -101,17 +120,38 @@ int copy_directory(const char *src_path, const char *dst_path)
         int dst_path_size = snprintf(dst_entry_path, PATH_BUF_SIZE, "%s/%s", dst_path, entry->d_name);
 
         if (src_path_size < 0 || src_path_size >= PATH_BUF_SIZE || dst_path_size < 0 || dst_path_size >= PATH_BUF_SIZE) {
-            fprintf(stderr, "[!] Unable format path to '%s'\n", entry->d_name);
+            fprintf(stderr, "[!] Path too long for entry '%s'\n", entry->d_name);
+            closedir(dir);
             return -1;
         }
 
-        switch (entry->d_type) {
+        unsigned char d_type = entry->d_type;
+        if (d_type == DT_UNKNOWN) {
+            struct stat entry_stat;
+            if (stat(src_entry_path, &entry_stat) != 0) {
+                fprintf(stderr, "[!] Unable to stat '%s'\n", src_entry_path);
+                closedir(dir);
+                return -1;
+            }
+
+            if (S_ISDIR(entry_stat.st_mode))       
+                d_type = DT_DIR;
+            else if (S_ISLNK(entry_stat.st_mode))  
+                d_type = DT_LNK;
+            else                                    
+                d_type = DT_REG;
+        }
+
+        switch (d_type) {
             case DT_DIR:
                 if (copy_directory(src_entry_path, dst_entry_path) != 0) {
                     closedir(dir);
                     return -1;
                 }
 
+                break;
+            case DT_LNK:
+                fprintf(stderr, "[*] Skipping symlink '%s'\n", src_entry_path);
                 break;
             default:
                 if (copy_file(src_entry_path, dst_entry_path) != 0) {
@@ -131,7 +171,10 @@ int main(int argc, char *argv[])
 {
     args_t args;
     if (parse_args(argc, argv, &args))
-        return -1;
+        return EXIT_FAILURE;
 
-    return copy_directory(args.src, args.dst);
+    if (copy_directory(args.src, args.dst) != 0)
+        return EXIT_FAILURE;
+
+    return EXIT_SUCCESS;
 }
