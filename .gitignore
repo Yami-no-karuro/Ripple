@@ -3,6 +3,3 @@
 
 /target/debug/*
 !/target/debug/.gitkeep
-
-/data/*
-!/data/.gitkeep
