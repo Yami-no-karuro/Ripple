@@ -136,8 +136,6 @@ int copy_directory(const char *src_path, const char *dst_path)
 
             if (S_ISDIR(entry_stat.st_mode))       
                 d_type = DT_DIR;
-            else if (S_ISLNK(entry_stat.st_mode))  
-                d_type = DT_LNK;
             else                                    
                 d_type = DT_REG;
         }
@@ -149,9 +147,6 @@ int copy_directory(const char *src_path, const char *dst_path)
                     return -1;
                 }
 
-                break;
-            case DT_LNK:
-                fprintf(stderr, "[*] Skipping symlink '%s'\n", src_entry_path);
                 break;
             default:
                 if (copy_file(src_entry_path, dst_entry_path) != 0) {
